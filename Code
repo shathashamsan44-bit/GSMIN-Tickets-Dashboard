@@ -1,0 +1,1093 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GSMIN Tickets Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <style>
+    :root {
+      --dark-bg: #101626;
+      --panel-bg: #182038;
+      --card-hover: #212c4b;
+      --batelco-red: #e51535;
+      --border-color: #263352;
+      --text-main: #ffffff;
+      --text-muted: #8e9bb0;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --accent-blue: #0284c7;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--dark-bg);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header-bar {
+      height: 56px;
+      min-height: 56px;
+      background: var(--dark-bg);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 16px;
+      position: relative;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      z-index: 2;
+    }
+
+    .brand-logo svg {
+      height: 38px;
+      width: auto;
+    }
+
+    .header-title {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: 0.5px;
+    }
+
+    .app-container {
+      display: flex;
+      flex: 1;
+      height: calc(100vh - 56px);
+      overflow: hidden;
+    }
+
+    .sidebar {
+      width: 220px;
+      min-width: 220px;
+      background-color: var(--dark-bg);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      padding: 10px;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .upload-box {
+      background: transparent;
+      border: 1px dashed #2d3b5e;
+      border-radius: 6px;
+      padding: 10px 8px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .upload-box:hover {
+      background: var(--card-hover);
+      border-color: var(--batelco-red);
+    }
+
+    .upload-box span.title {
+      font-size: 11px;
+      color: #cbd5e1;
+      font-weight: 600;
+      display: block;
+      pointer-events: none;
+    }
+
+    .upload-box input[type="file"] { display: none; }
+
+    .nav-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 4px;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    .nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 6px 8px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      width: 100%;
+    }
+
+    .nav-btn:hover {
+      background-color: var(--card-hover);
+      color: var(--text-main);
+    }
+
+    .nav-btn.active {
+      background-color: var(--batelco-red);
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .nav-btn.full-width {
+      grid-column: span 2;
+    }
+
+    .action-group {
+      margin-top: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .analysis-btn {
+      background-color: #161e33;
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      font-weight: 600;
+      font-size: 11px;
+      padding: 8px;
+      border-radius: 4px;
+    }
+
+    .analysis-btn:hover {
+      background-color: var(--card-hover);
+      border-color: var(--accent-blue);
+      color: #ffffff;
+    }
+
+    .main-content {
+      flex: 1;
+      padding: 10px;
+      background-color: var(--dark-bg);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .stats-container {
+      width: 100%;
+      overflow: hidden;
+      min-height: 62px;
+      max-height: 62px;
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 4px;
+    }
+
+    .stats-grid {
+      display: flex;
+      gap: 6px;
+      width: 100%;
+      height: 100%;
+    }
+
+    .stat-card {
+      background-color: var(--dark-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      padding: 6px 8px;
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .stat-card h4 {
+      font-size: 8px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .stat-card .value {
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1;
+    }
+
+    .dashboard-body {
+      display: grid;
+      grid-template-columns: 1.1fr 1.2fr;
+      gap: 10px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .chart-box, .table-box {
+      background-color: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    .chart-box {
+      flex: 1;
+    }
+
+    .chart-box h3, .table-box h3 {
+      font-size: 12px;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .chart-container {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-height: 120px;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 7px 10px;
+      margin-bottom: 8px;
+      background: var(--dark-bg);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      border-radius: 4px;
+      outline: none;
+      font-size: 11px;
+    }
+
+    .search-input:focus { border-color: var(--batelco-red); }
+
+    .table-container {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+
+    th, td {
+      padding: 6px 8px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    th {
+      background-color: var(--dark-bg);
+      color: var(--text-muted);
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    td { color: var(--text-main); }
+
+    tbody tr {
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+    }
+
+    tbody tr:hover { background-color: var(--card-hover); }
+
+    .ticket-cell-desc {
+      max-width: 250px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      color: #cbd5e1;
+    }
+
+    .badge {
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 9px;
+      font-weight: 700;
+      display: inline-block;
+      white-space: nowrap;
+    }
+    .badge-item { background: #0284c7; color: #e0f2fe; }
+    .badge-other { background: #334155; color: #cbd5e1; }
+
+    .custom-legend {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 4px 6px;
+      margin-top: 6px;
+      font-size: 9px;
+      color: var(--text-muted);
+      max-height: 50px;
+      overflow-y: auto;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .legend-color {
+      width: 10px;
+      height: 6px;
+      border-radius: 1px;
+      flex-shrink: 0;
+    }
+
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+
+    .modal-content {
+      background: var(--panel-bg);
+      border: 1px solid var(--border-color);
+      padding: 16px;
+      border-radius: 8px;
+      width: 520px;
+      max-width: 90%;
+      max-height: 85vh;
+      overflow-y: auto;
+      color: var(--text-main);
+      box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-header h2 { color: var(--text-main); font-size: 14px; font-weight: 700; }
+    .close-btn { cursor: pointer; font-size: 18px; color: var(--text-muted); line-height: 1; }
+    .close-btn:hover { color: var(--text-main); }
+
+    .problem-rank {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      background: var(--dark-bg);
+    }
+
+    .most-prob { border-left: 4px solid var(--danger); }
+    .least-prob { border-left: 4px solid var(--success); }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+      background: var(--dark-bg);
+      padding: 8px;
+      border-radius: 6px;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .detail-item label {
+      font-size: 8px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .detail-item span {
+      font-size: 11px;
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    .full-desc-box {
+      background: var(--dark-bg);
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 10px;
+      line-height: 1.4;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 180px;
+      overflow-y: auto;
+      border: 1px solid var(--border-color);
+    }
+  </style>
+</head>
+<body>
+
+  <header class="header-bar">
+    <div class="brand-logo">
+      <svg viewBox="0 0 250 60" xmlns="http://www.w3.org/2000/svg">
+        <rect x="0" y="12" width="16" height="34" rx="8" fill="#e51535"/>
+        <circle cx="27" cy="20" r="8" fill="#e51535"/>
+        <circle cx="27" cy="38" r="8" fill="#e51535"/>
+        <text x="45" y="36" font-family="sans-serif" font-size="26" font-weight="700" fill="#ffffff">Batelco</text>
+        <text x="108" y="47" font-family="sans-serif" font-size="12" font-weight="400" fill="#ffffff">by Beyon</text>
+      </svg>
+    </div>
+    <h1 class="header-title">GSMIN Tickets Dashboard</h1>
+    <div></div>
+  </header>
+
+  <div class="app-container">
+    <div class="sidebar">
+      <div class="upload-box" onclick="document.getElementById('excelFileInput').click()">
+        <span class="title">📁 Upload File (CSV or Excel)</span>
+        <input type="file" id="excelFileInput" accept=".csv, .xlsx, .xls" onchange="handleFileUpload(event)">
+        <span id="fileName" style="font-size:9px; color:var(--text-muted); display:block; margin-top:2px; pointer-events:none;">No file selected</span>
+      </div>
+
+      <div class="nav-grid" id="categoryButtons">
+        <button class="nav-btn full-width active" onclick="filterData('All', event)">All Categories</button>
+      </div>
+
+      <div class="action-group">
+        <button class="nav-btn analysis-btn" onclick="openDayAnalysisModal()">📅 Day with Most Problems</button>
+        <button class="nav-btn analysis-btn" onclick="openModal()">📊 Most vs Least Problems</button>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <div class="stats-container">
+        <div class="stats-grid" id="statsGrid"></div>
+      </div>
+
+      <div class="dashboard-body">
+        <div class="left-column">
+          <div class="chart-box">
+            <h3>Group Category Distribution</h3>
+            <div class="chart-container">
+              <canvas id="issueChart"></canvas>
+            </div>
+            <div id="customLegend" class="custom-legend"></div>
+          </div>
+
+          <div class="chart-box">
+            <h3>Days with High Ticket Volume (≥ 15 Tickets)</h3>
+            <div class="chart-container">
+              <canvas id="dayBarChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="table-box">
+          <h3>Ticket Breakdown</h3>
+          <input type="text" id="searchInput" class="search-input" placeholder="Search keyword, ID, date, or description..." onkeyup="searchTable()">
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Group Category</th>
+                  <th>Matched Keyword</th>
+                  <th>Ticket Details</th>
+                  <th>Created Date</th>
+                </tr>
+              </thead>
+              <tbody id="ticketTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="problemModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Problem Ranking Analysis</h2>
+        <span class="close-btn" onclick="closeModal('problemModal')">&times;</span>
+      </div>
+      <div id="modalBody"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="dayModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>📅 Busiest Day Analysis</h2>
+        <span class="close-btn" onclick="closeModal('dayModal')">&times;</span>
+      </div>
+      <div id="dayModalBody"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="ticketDetailModal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="modalTicketTitle">Ticket Details</h2>
+        <span class="close-btn" onclick="closeModal('ticketDetailModal')">&times;</span>
+      </div>
+      <div class="detail-grid" id="ticketDetailGrid"></div>
+      <label style="font-size: 9px; text-transform: uppercase; color: var(--text-muted); font-weight: 700; display: block; margin-bottom: 4px;">Full Ticket Details</label>
+      <div class="full-desc-box" id="ticketFullDesc"></div>
+    </div>
+  </div>
+
+  <script>
+    let tickets = [];
+    let groupCounts = {};
+    let issueChart = null;
+    let dayBarChart = null;
+
+    // Strict evaluation order: Specific categories FIRST, generic terms LAST
+    const categoryGroups = [
+      {
+        name: 'DA50',
+        keywords: ['da#50', 'da50', 'da 50', 'd50']
+      },
+      {
+        name: 'Roaming',
+        keywords: ['voya ksa kw', 'voya', 'roaming', 'ww', 'gcc', 'worldwide', 'abroad', 'international roaming']
+      },
+      {
+        name: 'IDD Issues',
+        keywords: ['idd', 'international call', 'cannot call idd', 'international calling', 'idd call']
+      },
+      {
+        name: 'Refill',
+        keywords: ['refill', 'voucher', 'recharge', 'top up', 'topup', 'scratch card', 'pin', 'recharge failed']
+      },
+      {
+        name: 'Advance Package',
+        keywords: [
+          '6-month package', 'one year package', 'one year', '1 year', '12m advance',
+          '12-month package', '12-month advance', '12 months package', 'validity',
+          '6 months', 'advance package', '12 month offer', '12 months advance', '6m advance'
+        ]
+      },
+      {
+        name: 'Data Carry Over',
+        keywords: [
+          'carry over', 'caried over', 'should have 24 gb', 'supposed to have 24 gb',
+          'roll over data', 'data carry over', 'carry forwarded', 'carry out', 'rollover'
+        ]
+      },
+      {
+        name: 'Hotspot',
+        keywords: ['hotspot', 'hot spot', 'tethering', 'wifi sharing', 'personal hotspot', 'share data', 'access point', 'apn']
+      },
+      {
+        name: 'One Plan',
+        keywords: ['one plan', '1 plan', 'oneplan', 'single plan', 'unified plan']
+      },
+      {
+        name: 'FAILED ORDER',
+        keywords: [
+          'failed order', 'ecommerce prepaid activation order', 'order to complete',
+          'complete order', 'pending order', 'failure', 'failed', 'order failure'
+        ]
+      },
+      {
+        name: 'Call Issues',
+        keywords: ['cannot make calls', 'cannot call', 'calls', 'call', 'voice call', 'dropped call', 'incoming call', 'outgoing call']
+      },
+      {
+        name: 'Data Issues',
+        keywords: ['gprs', 'social media', 'abusive usage', 'usage', 'data', 'no internet', 'slow speed', '4g', '5g', 'data connection', 'browsing', 'mb', 'gb', 'quota', 'bandwidth']
+      },
+      {
+        name: 'OTHER',
+        keywords: []
+      }
+    ];
+
+    const chartSliceColors = [
+      '#e51535', '#0284c7', '#f97316', '#16a34a', '#ea580c',
+      '#8b5cf6', '#0d9488', '#dc2626', '#2563eb',
+      '#0ea5e9', '#64748b', '#475569'
+    ];
+
+    window.onload = function() {
+      updateSidebarCategoryButtons();
+      updateStatsUI();
+      updateChartUI(groupCounts);
+      updateDayBarChart([]);
+      renderTable([]);
+    };
+
+    function isMatch(text, keyword) {
+      if (!text) return false;
+      const str = String(text).toLowerCase();
+      const kw = keyword.toLowerCase();
+     
+      const escapedKw = kw.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+      const regex = new RegExp(`(?:^|\\b|\\s)${escapedKw}(?:$|\\b|\\s)`, 'i');
+      return regex.test(str);
+    }
+
+    function extractDateOnly(val) {
+      if (!val) return 'N/A';
+      const str = String(val).trim();
+      const match = str.match(/\d{4}-\d{2}-\d{2}/) || str.match(/\d{1,2}\/\d{1,2}\/\d{2,4}/);
+      return match ? match[0] : str.substring(0, 10);
+    }
+
+    function updateSidebarCategoryButtons() {
+      const container = document.getElementById('categoryButtons');
+      let html = `<button class="nav-btn full-width active" onclick="filterData('All', event)">All Categories (${tickets.length})</button>`;
+     
+      categoryGroups.forEach(g => {
+        const count = groupCounts[g.name] || 0;
+        html += `<button class="nav-btn" onclick="filterData('${g.name}', event)">${g.name} (${count})</button>`;
+      });
+
+      container.innerHTML = html;
+    }
+
+    function updateStatsUI(customCounts = null) {
+      const statsGrid = document.getElementById('statsGrid');
+      const targetCounts = customCounts || groupCounts;
+
+      const htmlContent = categoryGroups.map(group => {
+        const count = targetCounts[group.name] || 0;
+        return `
+          <div class="stat-card" style="cursor:pointer;" onclick="filterData('${group.name}')">
+            <h4>${group.name}</h4>
+            <div class="value">${count}</div>
+          </div>
+        `;
+      }).join('');
+
+      statsGrid.innerHTML = htmlContent;
+    }
+
+    function updateChartUI(countsToDisplay) {
+      const ctx = document.getElementById('issueChart').getContext('2d');
+      if (issueChart) issueChart.destroy();
+
+      const labels = categoryGroups.map(g => g.name);
+      const counts = countsToDisplay || groupCounts;
+      const rawData = labels.map(lbl => counts[lbl] || 0);
+      const totalTickets = rawData.reduce((a, b) => a + b, 0);
+
+      const chartData = totalTickets > 0 ? rawData : labels.map(() => 1);
+      const bgColors = totalTickets > 0 ? chartSliceColors : labels.map(() => '#263352');
+
+      issueChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: chartData,
+            backgroundColor: bgColors,
+            borderWidth: 2,
+            borderColor: '#182038'
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (evt, activeElements) => {
+            if (activeElements.length > 0) {
+              const index = activeElements[0].index;
+              const clickedCategory = labels[index];
+              filterData(clickedCategory);
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  return totalTickets === 0 ? `${context.label}: 0 tickets` : `${context.label}: ${rawData[context.dataIndex]} tickets`;
+                }
+              }
+            }
+          },
+          cutout: '62%'
+        }
+      });
+
+      const legendBox = document.getElementById('customLegend');
+      legendBox.innerHTML = labels.map((label, idx) => `
+        <div class="legend-item" onclick="filterData('${label}')">
+          <span class="legend-color" style="background-color:${chartSliceColors[idx]};"></span>
+          <span title="${label}">${label}</span>
+        </div>
+      `).join('');
+    }
+
+    function updateDayBarChart(filteredTickets) {
+      const ctx = document.getElementById('dayBarChart').getContext('2d');
+      if (dayBarChart) dayBarChart.destroy();
+
+      const dateMap = {};
+      filteredTickets.forEach(t => {
+        if (t.date && t.date !== 'N/A') {
+          dateMap[t.date] = (dateMap[t.date] || 0) + 1;
+        }
+      });
+
+      const highVolumeDates = Object.keys(dateMap).filter(d => dateMap[d] >= 15).sort();
+      const counts = highVolumeDates.map(d => dateMap[d]);
+
+      let maxVal = Math.max(...counts, 0);
+      const bgColors = counts.map(c => c === maxVal && maxVal > 0 ? '#e51535' : '#0284c7');
+
+      dayBarChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: highVolumeDates.length > 0 ? highVolumeDates : ['No Days ≥ 15'],
+          datasets: [{
+            label: 'Number of Tickets',
+            data: counts.length > 0 ? counts : [0],
+            backgroundColor: bgColors.length > 0 ? bgColors : ['#263352'],
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (context) => `Tickets: ${context.raw}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#8e9bb0', font: { size: 9 }, maxRotation: 45 },
+              grid: { display: false }
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { color: '#8e9bb0', font: { size: 9 }, precision: 0 },
+              grid: { color: '#263352' },
+              title: {
+                display: true,
+                text: 'Number of Tickets',
+                color: '#8e9bb0',
+                font: { size: 10 }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function renderTable(data) {
+      const tbody = document.getElementById('ticketTableBody');
+
+      if (!data || data.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; color:var(--text-muted); padding:20px;">No tickets found. Upload a file or adjust filters.</td></tr>`;
+        return;
+      }
+
+      const rows = data.map(t => {
+        const badgeClass = t.group === 'OTHER' ? 'badge-other' : 'badge-item';
+        return `
+          <tr onclick="openTicketDetailModal('${t.id}')">
+            <td>#${t.id}</td>
+            <td><span class="badge ${badgeClass}">${t.group}</span></td>
+            <td><em style="color:#8e9bb0;">${t.keyword}</em></td>
+            <td><div class="ticket-cell-desc">${t.desc}</div></td>
+            <td>${t.date}</td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.innerHTML = rows;
+    }
+
+    function handleFileUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      document.getElementById('fileName').innerText = file.name;
+
+      if (file.name.endsWith('.csv')) {
+        Papa.parse(file, {
+          header: true,
+          skipEmptyLines: true,
+          worker: false,
+          complete: function(results) {
+            processUploadedData(results.data);
+          }
+        });
+      } else {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rawData = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+          processUploadedData(rawData);
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    function processUploadedData(rawData) {
+      tickets = [];
+      groupCounts = {};
+      categoryGroups.forEach(g => groupCounts[g.name] = 0);
+
+      rawData.forEach((row, index) => {
+        let id = row['Ticket Id'] || row['Ticket ID'] || row['ID'] || index + 1;
+        let priority = row['Priority'] || 'Low';
+        let rawDate = row['Created Time'] || row['Created Date'] || row['Date'] || 'N/A';
+        let mainDesc = row['Description'] || row['Subject'] || row['Details'] || '';
+        let categoryName = row['Category'] || 'Unassigned';
+        let subCategoryName = row['Sub-Category'] || 'None';
+        let itemName = row['Item'] || 'None';
+        let status = row['Status'] || 'Unknown';
+        let agent = row['Agent'] || 'Unassigned';
+
+        let department = row['Department'] || 'N/A';
+        let dueByTime = row['Due by Time'] || 'N/A';
+        let group = row['Group'] || 'N/A';
+        let impact = row['Impact'] || 'N/A';
+        let requesterEmail = row['Requester Email'] || 'N/A';
+        let requesterName = row['Requester Name'] || 'N/A';
+        let resolvedTime = row['Resolved Time'] || 'N/A';
+        let source = row['Source'] || 'N/A';
+        let subject = row['Subject'] || 'N/A';
+        let type = row['Type'] || 'N/A';
+        let urgency = row['Urgency'] || 'N/A';
+
+        if (!mainDesc) {
+          mainDesc = Object.values(row).join(' ').trim();
+        }
+
+        const rowString = Object.values(row).join(' ');
+
+        let matchedGroup = 'OTHER';
+        let matchedKeyword = 'None';
+
+        for (let g of categoryGroups) {
+          if (g.name === 'OTHER') continue;
+          for (let kw of g.keywords) {
+            if (isMatch(rowString, kw)) {
+              matchedGroup = g.name;
+              matchedKeyword = kw;
+              break;
+            }
+          }
+          if (matchedGroup !== 'OTHER') break;
+        }
+
+        groupCounts[matchedGroup] = (groupCounts[matchedGroup] || 0) + 1;
+
+        tickets.push({
+          id: id,
+          group: matchedGroup,
+          keyword: matchedKeyword,
+          desc: mainDesc,
+          priority: priority,
+          date: extractDateOnly(rawDate),
+          csvCategory: categoryName,
+          csvSubCategory: subCategoryName,
+          csvItem: itemName,
+          status: status,
+          agent: agent,
+          department: department,
+          dueByTime: dueByTime,
+          assignedGroup: group,
+          impact: impact,
+          requesterEmail: requesterEmail,
+          requesterName: requesterName,
+          resolvedTime: resolvedTime,
+          source: source,
+          subject: subject,
+          type: type,
+          urgency: urgency
+        });
+      });
+
+      updateSidebarCategoryButtons();
+      updateStatsUI();
+      updateChartUI(groupCounts);
+      updateDayBarChart(tickets);
+      renderTable(tickets);
+    }
+
+    function openTicketDetailModal(id) {
+      const ticket = tickets.find(t => t.id == id);
+      if (!ticket) return;
+
+      document.getElementById('modalTicketTitle').innerText = `Ticket Details - #${ticket.id}`;
+      document.getElementById('ticketDetailGrid').innerHTML = `
+        <div class="detail-item"><label>Ticket ID</label><span>#${ticket.id}</span></div>
+        <div class="detail-item"><label>Matched Category</label><span>${ticket.group}</span></div>
+        <div class="detail-item"><label>Matched Keyword</label><span>${ticket.keyword}</span></div>
+        <div class="detail-item"><label>Created Time</label><span>${ticket.date}</span></div>
+        <div class="detail-item"><label>Subject</label><span>${ticket.subject}</span></div>
+        <div class="detail-item"><label>Category</label><span>${ticket.csvCategory}</span></div>
+        <div class="detail-item"><label>Sub-Category</label><span>${ticket.csvSubCategory}</span></div>
+        <div class="detail-item"><label>Item</label><span>${ticket.csvItem}</span></div>
+        <div class="detail-item"><label>Status / Agent</label><span>${ticket.status} (${ticket.agent})</span></div>
+        <div class="detail-item"><label>Department</label><span>${ticket.department}</span></div>
+        <div class="detail-item"><label>Group</label><span>${ticket.assignedGroup}</span></div>
+        <div class="detail-item"><label>Requester</label><span>${ticket.requesterName} (${ticket.requesterEmail})</span></div>
+        <div class="detail-item"><label>Priority / Impact / Urgency</label><span>${ticket.priority} / ${ticket.impact} / ${ticket.urgency}</span></div>
+        <div class="detail-item"><label>Type / Source</label><span>${ticket.type} / ${ticket.source}</span></div>
+        <div class="detail-item"><label>Due By Time</label><span>${ticket.dueByTime}</span></div>
+        <div class="detail-item"><label>Resolved Time</label><span>${ticket.resolvedTime}</span></div>
+      `;
+      document.getElementById('ticketFullDesc').innerText = ticket.desc;
+      document.getElementById('ticketDetailModal').style.display = 'flex';
+    }
+
+    function filterData(groupName, evt) {
+      document.querySelectorAll('#categoryButtons .nav-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.innerText.startsWith(groupName) || (groupName === 'All' && btn.innerText.startsWith('All Categories'))) {
+          btn.classList.add('active');
+        }
+      });
+
+      if (groupName === 'All') {
+        updateStatsUI(groupCounts);
+        updateChartUI(groupCounts);
+        updateDayBarChart(tickets);
+        renderTable(tickets);
+      } else {
+        const filtered = tickets.filter(t => t.group === groupName);
+        const singleCategoryCount = {};
+        Object.keys(groupCounts).forEach(k => singleCategoryCount[k] = (k === groupName ? groupCounts[groupName] : 0));
+
+        updateStatsUI(singleCategoryCount);
+        updateChartUI(singleCategoryCount);
+        updateDayBarChart(filtered);
+        renderTable(filtered);
+      }
+    }
+
+    function searchTable() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = tickets.filter(t =>
+        String(t.desc).toLowerCase().includes(q) ||
+        String(t.group).toLowerCase().includes(q) ||
+        String(t.keyword).toLowerCase().includes(q) ||
+        String(t.id).toLowerCase().includes(q) ||
+        String(t.date).toLowerCase().includes(q) ||
+        String(t.csvCategory).toLowerCase().includes(q) ||
+        String(t.requesterName).toLowerCase().includes(q) ||
+        String(t.requesterEmail).toLowerCase().includes(q) ||
+        String(t.subject).toLowerCase().includes(q)
+      );
+      updateDayBarChart(filtered);
+      renderTable(filtered);
+    }
+
+    function openModal() {
+      const modalBody = document.getElementById('modalBody');
+      if (tickets.length === 0) {
+        modalBody.innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:15px; font-size:11px;">Please upload a file first.</p>`;
+      } else {
+        const sorted = Object.entries(groupCounts).sort((a,b) => b[1] - a[1]);
+        modalBody.innerHTML = `
+          <div class="problem-rank most-prob">
+            <div><strong>🔥 Most Common Problem</strong><div>${sorted[0][0]}</div></div>
+            <div style="font-size:16px; font-weight:bold; color:var(--danger);">${sorted[0][1]} Cases</div>
+          </div>
+          <div class="problem-rank least-prob">
+            <div><strong>❄️ Least Common Problem</strong><div>${sorted[sorted.length-1][0]}</div></div>
+            <div style="font-size:16px; font-weight:bold; color:var(--success);">${sorted[sorted.length-1][1]} Cases</div>
+          </div>
+        `;
+      }
+      document.getElementById('problemModal').style.display = 'flex';
+    }
+
+    function openDayAnalysisModal() {
+      const dayModalBody = document.getElementById('dayModalBody');
+      if (tickets.length === 0) {
+        dayModalBody.innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:15px; font-size:11px;">Please upload a file first.</p>`;
+      } else {
+        const dateCounts = {};
+        tickets.forEach(t => {
+          if (t.date && t.date !== 'N/A') {
+            dateCounts[t.date] = (dateCounts[t.date] || 0) + 1;
+          }
+        });
+
+        const sortedDates = Object.entries(dateCounts).sort((a,b) => b[1] - a[1]);
+       
+        if (sortedDates.length === 0) {
+          dayModalBody.innerHTML = `<p style="color:var(--text-muted); text-align:center; padding:15px; font-size:11px;">No valid date column detected in the uploaded file.</p>`;
+        } else {
+          const peak = sortedDates[0];
+          dayModalBody.innerHTML = `
+            <div class="problem-rank most-prob">
+              <div><strong>📅 Day with Most Problems</strong><div>${peak[0]}</div></div>
+              <div style="font-size:18px; font-weight:bold; color:var(--danger);">${peak[1]} Tickets</div>
+            </div>
+            <div style="margin-top:10px; font-size:11px; color:var(--text-muted);">
+              <strong>Top 3 Peak Days:</strong>
+              <ul style="margin-top:4px; padding-left:16px;">
+                ${sortedDates.slice(0, 3).map(d => `<li style="margin-bottom:2px;">${d[0]}: <strong>${d[1]} tickets</strong></li>`).join('')}
+              </ul>
+            </div>
+          `;
+        }
+      }
+      document.getElementById('dayModal').style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+      document.getElementById(modalId).style.display = 'none';
+    }
+  </script>
+</body>
+</html>
